@@ -1,0 +1,68 @@
+<!-- /**
+* AFYA GLOBALS by Marcin Chuć
+* e-mail: marcin ...change it to at... afya.pl
+* (C) 2024
+* ORCID: 0000-0002-8430-9763
+*/ -->
+<script type="text/javascript">
+    RED.nodes.registerType('AFYA-globals', {
+        category: 'function',
+        paletteLabel: 'set global variable',
+        color: 'rgba(218,45,68,0.5)',
+        defaults: {
+            name: { value: "" },
+            globalVariableName: { value: undefined, required: true },
+            globalVariableType: { value: "undefined", required: true },
+            globalVariableValue: { value: undefined, required: true }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "logo.svg",
+        label: function () {
+            if (this.globalVariableType === "undefined") {
+                return this.name || `${this.globalVariableName} [${this.globalVariableType}]`;
+            } else if (this.globalVariableType !== 'JSON') {
+                return this.name || `${this.globalVariableName} [${this.globalVariableType}] -> ${this.globalVariableValue}`;
+            } else {
+                return this.name || `${this.globalVariableName} [${this.globalVariableType}]`;
+            }
+        },
+        oneditprepare: function () {
+            if ($("#node-input-globalVariableName").val() === undefined) {
+                $("#node-input-globalVariableName").val("GLOBAL_" + Math.random().toString(36).substring(2, 5) + Date.now().toString().slice(-7));
+            }
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="AFYA-globals">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-globalVariableName"><i class="icon-bookmark"></i> Variable Name</label>
+        <input type="text" id="node-input-globalVariableName" placeholder="unique global variable name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-globalVariableType"><i class="icon-bookmark"></i> Variable Type</label>
+        <select id="node-input-globalVariableType">
+            <option value="float">float</option>
+            <option value="int">integer</option>
+            <option value="JSON">JSON</option>
+            <option value="bool">boolean</option>
+            <option value="str">string</option>
+            <option value="undefined">undefined</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-input-globalVariableValue"><i class="icon-bookmark"></i> Variable Value</label>
+        <input type="text" id="node-input-globalVariableValue" placeholder="your value">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="AFYA-globals">
+    <p>Stop writing global variables into functions. You'll get lost eventually. Define them in the node, and then
+        modify them later in the node flow if needed, via msg.payload (in a different place, so as not to overwrite the
+        original value. Remember to set the variable type to undefined if no type is specified.)</p>
+</script>
