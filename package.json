@@ -1,6 +1,6 @@
 {
   "name": "node-red-afya-globals",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Node-RED custom node to manage global variables.",
   "main": "globals.js",
   "node-red": {
@@ -13,5 +13,18 @@
     "type": "git",
     "url": "https://github.com/mchuc/node-red-afya-globals"
   },
-  "author": "Marcin Chuć, marcin a.t afya.pl"
+  "author": "Marcin Chuć, marcin a.t afya.pl",
+  "keywords": [
+    "node-red",
+    "inject",
+    "JSON",
+    "global",
+    "flow",
+    "variable",
+    "scope",
+    "value",
+    "AFYA",
+    "at start",
+    "set default values"
+  ]
 }
