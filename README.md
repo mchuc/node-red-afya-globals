@@ -13,7 +13,7 @@ This package requires Node-RED. You can install this package using npm:
 Ten pakiet wymaga Node-RED. Możesz zainstalować go za pomocą npm:
 
 ```bash
-npm install node-red-afya-globals
+npm install node-red-contrib-afya-globals
 ```
 
 ## Node Configuration / Konfiguracja węzła
