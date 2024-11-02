@@ -1,6 +1,6 @@
 {
   "name": "node-red-afya-globals",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Node-RED custom node to manage global variables.",
   "main": "globals.js",
   "node-red": {
