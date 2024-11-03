@@ -7,8 +7,19 @@ module.exports = function (RED) {
         const variableName = config.globalVariableName;
         const variableValue = config.globalVariableValue;
         const variableScope = config.globalVariableScope;
+        const variableEmit = config.globalEmitOnInit;
         //initialize
-        setVariable(node, variableScope, variableType, variableName, variableValue)
+        setVariable(node, variableScope, variableType, variableName, variableValue);
+        if (variableEmit) {
+            setTimeout(() => {
+                let msg = {
+                    payload: variableValue
+                };
+                node.send(msg);
+                node.status(genOKStatus(`${variableValue} emited on init`));
+            }, 100);
+
+        }
 
 
         // onMessage
