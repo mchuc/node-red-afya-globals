@@ -1,620 +1,209 @@
-<!-- /**
-* AFYA GLOBALS by Marcin Chuć
-* e-mail: marcin ...change it to at... afya.pl
-* (C) 2024
-* ORCID: 0000-0002-8430-9763
-*/ -->
+<!--
+  AFYA Globals – set a typed flow/global context variable.
+  (C) 2024–2026 Marcin Chuć · ORCID 0000-0002-8430-9763 · MIT
+-->
+<style>
+  /* AFYA – common editor style (identical in all AFYA nodes) */
+  .afya-form .form-row > label { width: 130px; }
+  .afya-form .afya-section {
+    display: flex; align-items: center; gap: 7px;
+    margin: 18px 0 10px; padding-bottom: 5px;
+    border-bottom: 1px solid var(--red-ui-secondary-border-color, #ddd);
+    color: var(--red-ui-primary-text-color, #555);
+    font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  }
+  .afya-form .afya-section > i { color: #3E9C86; width: 14px; text-align: center; }
+  .afya-form .afya-hint { margin: -4px 0 12px 134px; font-size: 12px; line-height: 1.45; color: var(--red-ui-secondary-text-color, #888); }
+  .afya-form .afya-hint code { font-size: 11px; }
+  .afya-form .afya-check { display: flex; align-items: center; gap: 8px; margin: 0 0 12px 134px; }
+  .afya-form .afya-check input { width: auto; margin: 0; }
+  .afya-form .afya-check label { width: auto; margin: 0; cursor: pointer; }
+  .afya-form .afya-unit { margin-left: 8px; color: var(--red-ui-secondary-text-color, #888); }
+  .afya-form .afya-summary {
+    display: flex; gap: 10px; align-items: flex-start;
+    margin-top: 18px; padding: 10px 12px; border-radius: 6px;
+    border-left: 4px solid #6CC1AD;
+    background: var(--red-ui-tertiary-background, #f7f7f7);
+    color: var(--red-ui-primary-text-color, #555); font-size: 12px; line-height: 1.55;
+  }
+  .afya-form .afya-summary > i { margin-top: 3px; color: #3E9C86; }
+  .afya-form .afya-summary code { font-size: 11px; }
+</style>
+
 <script type="text/javascript">
+  (function () {
+    const randomName = (prefix) => prefix + Math.random().toString(36).slice(2, 7) + Date.now().toString().slice(-5);
+    const plainKey = (v) => String(v || '').replace(/^#:\(\S+?\)::/, '');
+    const isNumber = (v) => /^\s*[-+]?(\d+([.,]\d*)?|[.,]\d+)([eE][-+]?\d+)?\s*$/.test(String(v));
+    const isJSON = (v) => { try { JSON.parse(v); return true; } catch (e) { return false; } };
+
     RED.nodes.registerType('AFYA-globals', {
-        category: 'function',
-        paletteLabel: 'set global variable',
-        color: 'rgba(218,45,68,0.5)',
-        defaults: {
-            name: {value: ""},
-            globalVariableName: {value: undefined, required: true},
-            globalVariableScope: {value: "global", required: true},
-            globalVariableType: {value: "undefined", required: true},
-            globalVariableValue: {value: undefined, required: false},
-            globalEmitOnInit: {value: false, required: false}
-        },
-        inputs: 1,
-        outputs: 1,
-        icon: "logo.png",
-        label: function () {
-            if (this.globalVariableType === "undefined") {
-                return this.name || `${this.globalVariableName} [${this.globalVariableType}]`;
-            } else if (this.globalVariableType !== 'JSON') {
-                return this.name || `${this.globalVariableName} [${this.globalVariableType}] -> ${this.globalVariableValue}`;
-            } else {
-                return this.name || `${this.globalVariableName} [${this.globalVariableType}]`;
-            }
-        },
-        oneditprepare: function () {
-            const globalVariableName = $("#node-input-globalVariableName").val()
-            if (globalVariableName === undefined || globalVariableName === "") {
-                $("#node-input-globalVariableName").val("GLOBAL_" + Math.random().toString(36).substring(2, 5) + Date.now().toString().slice(-7));
-            }
+      category: 'AFYA',
+      color: '#A6DCCF',
+      paletteLabel: 'set variable',
+      icon: 'font-awesome/fa-globe',
+      inputs: 1,
+      outputs: 1,
+      inputLabels: 'new value in msg.payload',
+      outputLabels: 'msg.payload = stored value',
+      defaults: {
+        name: { value: '' },
+        globalVariableName: { value: '', required: true },
+        globalVariableScope: { value: 'global', required: true },
+        globalVariableType: { value: 'undefined', required: true },
+        globalVariableValue: { value: '' },
+        globalEmitOnInit: { value: false },
+      },
+      label: function () {
+        if (this.name) return this.name;
+        const name = (this.globalVariableScope || 'global') + '.' + plainKey(this.globalVariableName);
+        if (!this.globalVariableType || this.globalVariableType === 'undefined') return name;
+        const value = this.globalVariableType === 'JSON' ? '{…}' : String(this.globalVariableValue);
+        const label = name + ' = ' + value;
+        return label.length > 42 ? label.slice(0, 41) + '…' : label;
+      },
+      labelStyle: function () {
+        return this.name ? 'node_label_italic' : '';
+      },
+      oneditprepare: function () {
+        const node = this;
+
+        // variable: global/flow + context store picker (native Node-RED widget)
+        if (!plainKey(node.globalVariableName)) {
+          $('#node-input-globalVariableName').val(randomName('GLOBAL_'));
         }
+        $('#node-input-globalVariableName').typedInput({
+          types: ['global', 'flow'],
+          typeField: '#node-input-globalVariableScope',
+        });
+
+        // value: one field + type picker
+        const jsonType = {
+          value: 'JSON', label: 'JSON', icon: 'red/images/typedInput/json.svg', validate: isJSON,
+        };
+        if (RED.editor && typeof RED.editor.editJSON === 'function') {
+          jsonType.expand = function () {
+            const that = this;
+            let value = this.value();
+            try { value = JSON.stringify(JSON.parse(value), null, 4); } catch (e) { /* keep as is */ }
+            RED.editor.editJSON({
+              value: value,
+              complete: function (v) {
+                let compact = v;
+                try { compact = JSON.stringify(JSON.parse(v)); } catch (e) { /* keep as is */ }
+                that.value(compact);
+              },
+            });
+          };
+        }
+        // legacy boolean values (1, 0, +, -) → true / false
+        if (node.globalVariableType === 'bool') {
+          const v = String(node.globalVariableValue).trim().toLowerCase();
+          $('#node-input-globalVariableValue').val(['true', '1', '+'].includes(v) ? 'true' : 'false');
+        }
+        $('#node-input-globalVariableValue').typedInput({
+          typeField: '#node-input-globalVariableType',
+          types: [
+            { value: 'str', label: 'string', icon: 'red/images/typedInput/az.svg' },
+            { value: 'int', label: 'integer', icon: 'red/images/typedInput/09.svg', validate: isNumber },
+            { value: 'float', label: 'float', icon: 'red/images/typedInput/09.svg', validate: isNumber },
+            { value: 'bool', label: 'boolean', icon: 'red/images/typedInput/bool.svg', options: ['true', 'false'] },
+            jsonType,
+            { value: 'undefined', label: 'none – wait for msg.payload', hasValue: false },
+          ],
+        });
+
+        const summary = function () {
+          const scope = $('#node-input-globalVariableName').typedInput('type');
+          const key = plainKey($('#node-input-globalVariableName').typedInput('value')) || '…';
+          const type = $('#node-input-globalVariableValue').typedInput('type');
+          const target = '<code>' + scope + '.' + $('<span>').text(key).html() + '</code>';
+          let text = type === 'undefined'
+            ? 'On deploy ' + target + ' is left untouched.'
+            : 'On deploy ' + target + ' is set to the value above (' + type + ').';
+          text += ' Every incoming <code>msg.payload</code> overwrites it' +
+            (type === 'undefined' ? '.' : ' – plain values are converted to ' + type + '.');
+          if ($('#node-input-globalEmitOnInit').is(':checked')) text += ' The value is also sent to the output right after deploy.';
+          $('#afya-globals-summary').html(text);
+        };
+        $('#node-input-globalVariableName, #node-input-globalVariableValue').on('change', summary);
+        $('#node-input-globalEmitOnInit').on('change', summary);
+        summary();
+      },
     });
+  })();
 </script>
 
 <script type="text/html" data-template-name="AFYA-globals">
+  <div class="afya-form">
     <div class="form-row">
-        <label for="node-input-name"><i class="fa fa-tag"></i> Node name</label>
-        <input type="text" id="node-input-name" placeholder="if empty shows value information">
+      <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+      <input type="text" id="node-input-name" placeholder="optional – shows the value when empty" style="width: 65%;">
     </div>
 
+    <div class="afya-section"><i class="fa fa-database"></i> Variable</div>
     <div class="form-row">
-        <label for="node-input-globalVariableName"><i class="fa fa-address-card"></i> Variable Name</label>
-        <input type="text" id="node-input-globalVariableName" placeholder="unique global variable name">
+      <label for="node-input-globalVariableName"><i class="fa fa-globe"></i> Variable</label>
+      <input type="text" id="node-input-globalVariableName" style="width: 65%;">
+      <input type="hidden" id="node-input-globalVariableScope">
     </div>
+    <div class="afya-hint">Unique name. Choose <b>global</b> to read it from any flow: <code>global.get("name")</code>.</div>
+
+    <div class="afya-section"><i class="fa fa-pencil"></i> Initial value</div>
     <div class="form-row">
-        <label for="node-input-globalVariableScope"><i class="fa fa-globe"></i> Variable scope</label>
-        <select id="node-input-globalVariableScope">
-            <option value="global">global</option>
-            <option value="flow">flow</option>
-        </select>
+      <label for="node-input-globalVariableValue"><i class="fa fa-cube"></i> Value</label>
+      <input type="text" id="node-input-globalVariableValue" style="width: 65%;">
+      <input type="hidden" id="node-input-globalVariableType">
     </div>
-    <div class="form-row">
-        <label for="node-input-globalVariableType"><i class="fa fa-file-o"></i> Variable Type</label>
-        <select id="node-input-globalVariableType">
-            <option value="float">float</option>
-            <option value="int">integer</option>
-            <option value="JSON">JSON</option>
-            <option value="bool">boolean</option>
-            <option value="str">string</option>
-            <option value="undefined">undefined</option>
-        </select>
+    <div class="afya-check">
+      <input type="checkbox" id="node-input-globalEmitOnInit">
+      <label for="node-input-globalEmitOnInit">Send the value to the output after deploy / restart</label>
     </div>
-    <div class="form-row">
-        <label for="node-input-globalVariableValue"><i class="fa fa-file-text-o"></i> Variable Value</label>
-        <textarea type="text" id="node-input-globalVariableValue" placeholder="your value" rows="5"></textarea>
-    </div>
-    <div class="form-row">
-        <label for="node-input-globalEmitOnInit"><i class="fa fa-bell-o"></i> Emit output on initialization</label>
-        <input type="checkbox" id="node-input-globalEmitOnInit">
-    </div>
+
+    <div class="afya-summary"><i class="fa fa-info-circle"></i><span id="afya-globals-summary"></span></div>
+  </div>
 </script>
 
 <script type="text/html" data-help-name="AFYA-globals">
-    <h2>AFYA Globals Node for Node-RED</h2>
+  <p>Sets a typed <b>global</b> or <b>flow</b> context variable – once on deploy and then with every incoming message.</p>
 
-    <p><strong>AFYA Globals</strong> is a custom Node-RED node designed to manage global and flow variables with type
-        handling and flexible value setting.</p>
-    <p><strong>AFYA Globals</strong> to niestandardowy węzeł Node-RED do zarządzania zmiennymi globalnymi i flow, z
-        obsługą typów i elastycznym ustawianiem wartości.</p>
+  <h3>Inputs</h3>
+  <dl class="message-properties">
+    <dt>payload <span class="property-type">any</span></dt>
+    <dd>New value of the variable. Plain values (text, number, boolean) are converted to the chosen type,
+      e.g. <code>"21,5"</code> → <code>21.5</code> for <i>float</i>. Objects and arrays are stored as they are.</dd>
+  </dl>
 
-    <h3>Node Configuration / Konfiguracja węzła</h3>
+  <h3>Outputs</h3>
+  <dl class="message-properties">
+    <dt>payload <span class="property-type">any</span></dt>
+    <dd>The stored (converted) value. The rest of the message is passed through.
+      With <i>Send the value after deploy</i> the node also emits <code>msg.payload</code> (and <code>msg.topic</code> =
+      variable name) 100&nbsp;ms after start.</dd>
+  </dl>
 
-    <p>The node allows initialization and modification of global or flow variables with a specified type. Each node can
-        set a variable and assign a value to it, supporting different types.</p>
-    <p>Węzeł umożliwia inicjalizację oraz modyfikację zmiennych globalnych lub flow o określonym typie. Każdy węzeł może
-        ustawić zmienną i przypisać jej wartość, obsługując różne typy.</p>
+  <h3>Types</h3>
+  <ul>
+    <li><b>string</b> – text.</li>
+    <li><b>integer</b> – <code>Math.floor</code> of the number; comma or dot as decimal separator.</li>
+    <li><b>float</b> – number; comma or dot as decimal separator.</li>
+    <li><b>boolean</b> – accepts <code>true/false</code>, <code>1/0</code>, <code>+/-</code>.</li>
+    <li><b>JSON</b> – object or array (edit it with the <i>…</i> button).</li>
+    <li><b>none</b> – nothing is set on deploy, the node waits for <code>msg.payload</code>.</li>
+  </ul>
 
-    <table>
-        <thead>
-        <tr>
-            <th>Option / Opcja</th>
-            <th>Type / Typ</th>
-            <th>Default Value / Domyślna wartość</th>
-            <th>Description / Opis</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr>
-            <td><strong>Variable Name</strong></td>
-            <td>String</td>
-            <td><code>undefined</code></td>
-            <td>Name of the global or flow variable. Required. / Nazwa zmiennej globalnej lub flow. Wymagana.</td>
-        </tr>
-        <tr>
-            <td><strong>Variable Scope</strong></td>
-            <td>String</td>
-            <td><code>global</code></td>
-            <td>Scope of the variable: <code>global</code> or <code>flow</code>. / Zakres zmiennej: <code>global</code>
-                lub <code>flow</code>.
-            </td>
-        </tr>
-        <tr>
-            <td><strong>Variable Type</strong></td>
-            <td>String</td>
-            <td><code>undefined</code></td>
-            <td>Variable type: <code>str</code>, <code>int</code>, <code>float</code>, <code>bool</code>,
-                <code>JSON</code>, <code>undefined</code>. / Typ zmiennej: <code>str</code>, <code>int</code>, <code>float</code>,
-                <code>bool</code>, <code>JSON</code>, <code>undefined</code>.
-            </td>
-        </tr>
-        <tr>
-            <td><strong>Variable Value</strong></td>
-            <td>Mixed</td>
-            <td><code>undefined</code></td>
-            <td>Initial value of the variable, dependent on the type. / Wartość inicjalizacyjna zmiennej, zależna od
-                typu.
-            </td>
-        </tr>
-        <tr>
-            <td><strong>Emit output on initialization</strong></td>
-            <td>Boolean</td>
-            <td><code>false</code></td>
-            <td>
-                outputs payload with variable value, right after node-red initialization (after running / deploy) as
-                payload: <code>msg.payload=[Variable Value]</code> /
-                wysyła na wyjście payload z wartością zmiennej, tuż po inicjalizacji node-red (po uruchomieniu / deploy)
-                jako payload: <code>msg.payload=[Variable Value]</code>
-            </td>
-        </tr>
-        <tr>
-            <td><strong>Name</strong></td>
-            <td>String</td>
-            <td></td>
-            <td>Optional name for the node, displayed in Node-RED. / Opcjonalna nazwa dla węzła, wyświetlana w
-                Node-RED.
-            </td>
-        </tr>
-        </tbody>
-    </table>
+  <h3>Details</h3>
+  <p>The variable can be read anywhere: <code>global.get("name")</code> / <code>flow.get("name")</code>, or in
+    <i>change</i>, <i>switch</i> and <i>inject</i> nodes. If more context stores are configured in
+    <code>settings.js</code> (e.g. <i>file</i>), the store can be chosen next to the variable name.</p>
+  <p>Status: <b>green</b> – value set, <b>grey</b> – waiting for the first value, <b>red</b> – conversion error
+    (the message is passed to a <i>catch</i> node).</p>
 
-    <h3>Variable Types / Typy zmiennych</h3>
+  <h3>Polski</h3>
+  <p>Ustawia zmienną kontekstu <b>global</b> lub <b>flow</b> z typem – raz po wdrożeniu i przy każdej wiadomości.
+    Wartości proste z <code>msg.payload</code> są zamieniane na wybrany typ (przecinek lub kropka w liczbach),
+    obiekty i tablice zapisywane bez zmian. Zmienną odczytasz w dowolnym flow przez
+    <code>global.get("nazwa")</code>. Opcja „Send the value…” wysyła wartość na wyjście zaraz po starcie.</p>
 
-    <table>
-        <thead>
-        <tr>
-            <th>Type / Typ</th>
-            <th>Description / Opis</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr>
-            <td><code>str</code></td>
-            <td>String, converted with <code>String(variableValue)</code>. / Łańcuch znaków, konwertowany za pomocą
-                <code>String(variableValue)</code>.
-            </td>
-        </tr>
-        <tr>
-            <td><code>int</code></td>
-            <td>Integer, converted with <code>Math.floor(Number(variableValue))</code>. / Liczba całkowita, konwertowana
-                za pomocą <code>Math.floor(Number(variableValue))</code>.
-            </td>
-        </tr>
-        <tr>
-            <td><code>float</code></td>
-            <td>Floating-point number, value remains <code>Number(variableValue)</code>. / Liczba zmiennoprzecinkowa,
-                pozostaje jako <code>Number(variableValue)</code>.
-            </td>
-        </tr>
-        <tr>
-            <td><code>bool</code></td>
-            <td>Boolean value: <code>true</code> or <code>false</code>. Accepted values: <code>true</code>,
-                <code>false</code>, <code>1</code>, <code>0</code>, <code>+</code>, <code>-</code>. / Wartość logiczna:
-                <code>true</code> lub <code>false</code>. Obsługiwane wartości wejściowe: <code>true</code>,
-                <code>false</code>, <code>1</code>, <code>0</code>, <code>+</code>, <code>-</code>.
-            </td>
-        </tr>
-        <tr>
-            <td><code>JSON</code></td>
-            <td>JSON object, parsed with <code>JSON.parse(variableValue)</code>. / Obiekt JSON, parsowany za pomocą
-                <code>JSON.parse(variableValue)</code>.
-            </td>
-        </tr>
-        <tr>
-            <td><code>undefined</code></td>
-            <td>Uninitialized value. Set the variable, waiting for the value from <code>payload</code>. / Nie
-                zainicjalizowana wartość. Ustawienie zmiennej w oczekiwaniu na nadanie wartości przez
-                <code>payload</code>.
-            </td>
-        </tr>
-        </tbody>
-    </table>
-
-    <h3>Node Statuses / Statusy węzła</h3>
-
-    <p>The node displays its current status:</p>
-    <p>Węzeł informuje o aktualnym stanie:</p>
-
-    <table>
-        <thead>
-        <tr>
-            <th>Color / Kolor</th>
-            <th>Status</th>
-            <th>Description / Opis</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr>
-            <td>Green</td>
-            <td>OK</td>
-            <td>Variable successfully set or updated. / Zmienna została poprawnie ustawiona lub zaktualizowana.</td>
-        </tr>
-        <tr>
-            <td>Red</td>
-            <td>ERR</td>
-            <td>An error occurred while setting or processing the variable. / Wystąpił błąd w trakcie ustawiania
-                zmiennej lub przetwarzania wartości.
-            </td>
-        </tr>
-        </tbody>
-    </table>
-    <hr>
-    <p><strong>Examples</strong></p>
-    <p>
-        <code>
-            [
-            {
-            "id": "1",
-            "type": "tab",
-            "label": "AFYA Globals Examples",
-            "disabled": false,
-            "info": ""
-            },
-            {
-            "id": "example1",
-            "type": "inject",
-            "z": "1",
-            "name": "Set global string",
-            "props": [
-            {
-            "p": "payload"
-            }
-            ],
-            "repeat": "",
-            "crontab": "",
-            "once": false,
-            "onceDelay": 0.1,
-            "topic": "",
-            "payload": "Hello World",
-            "payloadType": "str",
-            "x": 120,
-            "y": 60,
-            "wires": [
-            [
-            "globals1"
-            ]
-            ]
-            },
-            {
-            "id": "globals1",
-            "type": "AFYA-globals",
-            "z": "1",
-            "name": "",
-            "globalVariableName": "greeting",
-            "globalVariableScope": "global",
-            "globalVariableType": "str",
-            "globalVariableValue": "Hello World",
-            "x": 380,
-            "y": 60,
-            "wires": [
-            [
-            "d9f37f7ae1706d60"
-            ]
-            ]
-            },
-            {
-            "id": "example2",
-            "type": "inject",
-            "z": "1",
-            "name": "Set global integer",
-            "props": [
-            {
-            "p": "payload"
-            }
-            ],
-            "repeat": "",
-            "crontab": "",
-            "once": false,
-            "onceDelay": 0.1,
-            "topic": "",
-            "payload": "42",
-            "payloadType": "num",
-            "x": 120,
-            "y": 120,
-            "wires": [
-            [
-            "globals2"
-            ]
-            ]
-            },
-            {
-            "id": "globals2",
-            "type": "AFYA-globals",
-            "z": "1",
-            "name": "",
-            "globalVariableName": "answer",
-            "globalVariableScope": "global",
-            "globalVariableType": "int",
-            "globalVariableValue": "42",
-            "x": 350,
-            "y": 120,
-            "wires": [
-            [
-            "d9f37f7ae1706d60"
-            ]
-            ]
-            },
-            {
-            "id": "example3",
-            "type": "inject",
-            "z": "1",
-            "name": "Set global float",
-            "props": [
-            {
-            "p": "payload"
-            }
-            ],
-            "repeat": "",
-            "crontab": "",
-            "once": false,
-            "onceDelay": 0.1,
-            "topic": "",
-            "payload": "3.14",
-            "payloadType": "num",
-            "x": 120,
-            "y": 180,
-            "wires": [
-            [
-            "globals3"
-            ]
-            ]
-            },
-            {
-            "id": "globals3",
-            "type": "AFYA-globals",
-            "z": "1",
-            "name": "",
-            "globalVariableName": "pi",
-            "globalVariableScope": "global",
-            "globalVariableType": "float",
-            "globalVariableValue": "3,14",
-            "x": 340,
-            "y": 180,
-            "wires": [
-            [
-            "d9f37f7ae1706d60"
-            ]
-            ]
-            },
-            {
-            "id": "example4",
-            "type": "inject",
-            "z": "1",
-            "name": "Set global boolean",
-            "props": [
-            {
-            "p": "payload"
-            }
-            ],
-            "repeat": "",
-            "crontab": "",
-            "once": false,
-            "onceDelay": 0.1,
-            "topic": "",
-            "payload": "true",
-            "payloadType": "bool",
-            "x": 120,
-            "y": 240,
-            "wires": [
-            [
-            "globals4"
-            ]
-            ]
-            },
-            {
-            "id": "globals4",
-            "type": "AFYA-globals",
-            "z": "1",
-            "name": "",
-            "globalVariableName": "is_active",
-            "globalVariableScope": "global",
-            "globalVariableType": "bool",
-            "globalVariableValue": "1",
-            "x": 350,
-            "y": 240,
-            "wires": [
-            [
-            "d9f37f7ae1706d60"
-            ]
-            ]
-            },
-            {
-            "id": "example5",
-            "type": "inject",
-            "z": "1",
-            "name": "Set global JSON",
-            "props": [
-            {
-            "p": "payload"
-            }
-            ],
-            "repeat": "",
-            "crontab": "",
-            "once": false,
-            "onceDelay": 0.1,
-            "topic": "",
-            "payload": "{\"name\": \"John\", \"age\": 30}",
-            "payloadType": "json",
-            "x": 120,
-            "y": 300,
-            "wires": [
-            [
-            "globals5"
-            ]
-            ]
-            },
-            {
-            "id": "globals5",
-            "type": "AFYA-globals",
-            "z": "1",
-            "name": "",
-            "globalVariableName": "user_info",
-            "globalVariableScope": "global",
-            "globalVariableType": "JSON",
-            "globalVariableValue": "{\"name\": \"John\", \"age\": 30}",
-            "globalEmitOnInit": false,
-            "x": 350,
-            "y": 300,
-            "wires": [
-            [
-            "d9f37f7ae1706d60"
-            ]
-            ]
-            },
-            {
-            "id": "8acd6e590be8d3f1",
-            "type": "inject",
-            "z": "1",
-            "name": "Set global JSON",
-            "props": [
-            {
-            "p": "payload"
-            }
-            ],
-            "repeat": "",
-            "crontab": "",
-            "once": false,
-            "onceDelay": 0.1,
-            "topic": "",
-            "payload": "{\"name\": \"John\", \"age\": 30}",
-            "payloadType": "json",
-            "x": 120,
-            "y": 360,
-            "wires": [
-            [
-            "cc4c2daec15a5eb8"
-            ]
-            ]
-            },
-            {
-            "id": "cc4c2daec15a5eb8",
-            "type": "AFYA-globals",
-            "z": "1",
-            "name": "autoemit",
-            "globalVariableName": "start_me",
-            "globalVariableScope": "global",
-            "globalVariableType": "str",
-            "globalVariableValue": "node-red-init",
-            "globalEmitOnInit": true,
-            "x": 320,
-            "y": 360,
-            "wires": [
-            [
-            "d9f37f7ae1706d60",
-            "3252158596a8d390"
-            ]
-            ]
-            },
-            {
-            "id": "d9f37f7ae1706d60",
-            "type": "debug",
-            "z": "1",
-            "name": "debug 1",
-            "active": true,
-            "tosidebar": true,
-            "console": false,
-            "tostatus": false,
-            "complete": "false",
-            "statusVal": "",
-            "statusType": "auto",
-            "x": 740,
-            "y": 200,
-            "wires": []
-            },
-            {
-            "id": "7c0f4ed50ae82e9f",
-            "type": "comment",
-            "z": "1",
-            "name": "about autoemit",
-            "info": "now you can start emitting a signal, after initializing node-red - e.g. to set some initial data,
-            download them. server, or set data, after restart\nteraz możesz rozpocząć emisję sygnału, po inicjalizacji
-            node-red - np. dla ustawienia jakichś danych początkowych, pobrania ich. serwera, czy ustawienia danych, po
-            restarcie",
-            "x": 340,
-            "y": 420,
-            "wires": []
-            },
-            {
-            "id": "3252158596a8d390",
-            "type": "link out",
-            "z": "1",
-            "name": "link_out_EMIT",
-            "mode": "link",
-            "links": [
-            "0b335beb1d6269c7",
-            "3cd3360e0a5c13c4",
-            "e455d74b4e1cda2c"
-            ],
-            "x": 605,
-            "y": 360,
-            "wires": []
-            },
-            {
-            "id": "3cd3360e0a5c13c4",
-            "type": "link in",
-            "z": "1",
-            "name": "link in 1",
-            "links": [
-            "3252158596a8d390"
-            ],
-            "x": 735,
-            "y": 320,
-            "wires": [
-            [
-            "c8919efcc73f3ad0"
-            ]
-            ]
-            },
-            {
-            "id": "e455d74b4e1cda2c",
-            "type": "link in",
-            "z": "1",
-            "name": "link in 2",
-            "links": [
-            "3252158596a8d390"
-            ],
-            "x": 735,
-            "y": 380,
-            "wires": [
-            [
-            "c8919efcc73f3ad0"
-            ]
-            ]
-            },
-            {
-            "id": "0b335beb1d6269c7",
-            "type": "link in",
-            "z": "1",
-            "name": "link in 3",
-            "links": [
-            "3252158596a8d390"
-            ],
-            "x": 735,
-            "y": 440,
-            "wires": [
-            [
-            "c8919efcc73f3ad0"
-            ]
-            ]
-            },
-            {
-            "id": "c8919efcc73f3ad0",
-            "type": "debug",
-            "z": "1",
-            "name": "debug 2",
-            "active": true,
-            "tosidebar": true,
-            "console": false,
-            "tostatus": false,
-            "complete": "false",
-            "statusVal": "",
-            "statusType": "auto",
-            "x": 920,
-            "y": 360,
-            "wires": []
-            }
-            ] </code>
-    </p>
-    <p><strong>Author / Autor</strong></p>
-
-    <p>Marcin Chuć<br>
-        ORCID: 0000-0002-8430-9763<br>
-        E-mail: marcin...change it to at...afya.pl</p>
-
+  <p><small>Marcin Chuć · ORCID 0000-0002-8430-9763 · MIT</small></p>
 </script>

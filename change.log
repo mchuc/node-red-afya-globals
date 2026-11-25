@@ -1,0 +1,18 @@
+1.1.0 (2026-11-25):
+- Variable picker uses the native global/flow selector, incl. context stores (e.g. persistent "file" store)
+- One value field with a type picker: string, integer, float, boolean, JSON (with editor), none
+- Fixed: incoming msg.payload was handled wrongly (text failed as JSON, numbers threw an error)
+- Incoming plain values are converted to the chosen type, objects are stored as a copy,
+  the rest of the message is passed through
+- "Emit on init" sends the converted value (and msg.topic = variable name)
+- Errors are passed to a Catch node; the start-up timer is cleared on redeploy
+- New modern edit dialog (sections, live summary, spinners, validation), palette category "AFYA",
+  Font Awesome icon, English UI with English + Polish help
+- Short, consistent node status (value · time)
+- MIT license, Node-RED >= 3.0, Node.js >= 18, unit tests (`npm test`)
+
+1.0.6:
+- engines, readme
+
+1.0.0 – 1.0.5:
+- first versions: typed global / flow variables, emit on init

@@ -1,434 +1,114 @@
-# AFYA Globals Node for Node-RED v1.0.6
+# node-red-contrib-afya-globals
 
-**AFYA Globals** is a custom Node-RED node designed to manage global and flow variables with type handling and flexible value setting.  
+[![npm](https://img.shields.io/npm/v/node-red-contrib-afya-globals)](https://www.npmjs.com/package/node-red-contrib-afya-globals)
+[![license: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**AFYA Globals** to niestandardowy węzeł Node-RED do zarządzania zmiennymi globalnymi i flow, z obsługą typów i elastycznym ustawianiem wartości.  
+Node-RED node that sets **typed global or flow context variables** – once on deploy and then with every incoming message.
+
+**[English](#english) · [Polski](#polski)**
 
 ---
 
-## Installation / Instalacja
+## English
 
-This package requires Node-RED. You can install this package using npm:
+### What it does
 
-Ten pakiet wymaga Node-RED. Możesz zainstalować go za pomocą npm:
+* On deploy it sets `global.<name>` (or `flow.<name>`) to the configured value, converted to the chosen type.
+* Every incoming `msg.payload` overwrites the variable – plain values are converted to that type
+  (e.g. `"21,5"` → `21.5` for *float*), objects and arrays are stored as they are.
+* Optionally sends the value to the output right after deploy – handy for start-up initialisation.
+
+### Install
 
 ```bash
+cd ~/.node-red
 npm install node-red-contrib-afya-globals
 ```
 
-## Node Configuration / Konfiguracja węzła
+Requires Node-RED ≥ 3.0 and Node.js ≥ 18. The node appears in the **AFYA** palette group as **set variable**.
 
-| Option / Opcja     | Type / Typ | Default Value / Domyślna wartość | Description / Opis                                                                                                                                                                                           |
-|--------------------|------------|----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Variable Name**  | String     | `undefined`                      | Name of the global or flow variable. Required. / Nazwa zmiennej globalnej lub flow. Wymagana.                                                                                                                |
-| **Variable Scope** | String     | `global`                         | Scope of the variable: `global` or `flow`. / Zakres zmiennej: `global` lub `flow`.                                                                                                                           |
-| **Variable Type**  | String     | `undefined`                      | Variable type: `str`, `int`, `float`, `bool`, `JSON`, `undefined`. / Typ zmiennej: `str`, `int`, `float`, `bool`, `JSON`, `undefined`.                                                                       |
-| **Variable Value** | Mixed      | `undefined`                      | Initial value of the variable, dependent on the type. / Wartość inicjalizacyjna zmiennej, zależna od typu.                                                                                                   |
-| **Emit on init**   | Boolean    | `false`                          | Outputs payload with variable value, right after node-red initialization (after running / deploy) / Wysyła na wyjście payload z wartością zmiennej, tuż po inicjalizacji node-red (po uruchomieniu / deploy) |
-| **Name**           | String     |                                  | Optional name for the node, displayed in Node-RED. / Opcjonalna nazwa dla węzła, wyświetlana w Node-RED.                                                                                                     |
+### Configuration
 
----
+| Field | Description |
+|---|---|
+| **Variable** | Name and scope (`global` / `flow`). If more context stores are configured in `settings.js` (e.g. a persistent `file` store), you can pick the store here too. |
+| **Value** | Initial value with its type: `string`, `integer`, `float`, `boolean`, `JSON` or `none` (nothing is set on deploy, the node waits for `msg.payload`). |
+| **Send the value after deploy** | Emits `msg.payload` = value (and `msg.topic` = variable name) 100 ms after start. |
+| **Name** | Optional label; when empty the node shows `scope.name = value`. |
 
-## Variable Types / Typy zmiennych
+Type conversion:
 
-| Type / Typ   | Description / Opis                                                                                               |
-|--------------|------------------------------------------------------------------------------------------------------------------|
-| `str`        | String, converted with `String(variableValue)`. / Łańcuch znaków, konwertowany za pomocą `String(variableValue)`. |
-| `int`        | Integer, converted with `Math.floor(Number(variableValue))`. / Liczba całkowita, konwertowana za pomocą `Math.floor(Number(variableValue))`. |
-| `float`      | Floating-point number, value remains `Number(variableValue)`. / Liczba zmiennoprzecinkowa, pozostaje jako `Number(variableValue)`. |
-| `bool`       | Boolean value: `true` or `false`. Accepted values: `true`, `false`, `1`, `0`, `+`, `-`. / Wartość logiczna: `true` lub `false`. Obsługiwane wartości wejściowe: `true`, `false`, `1`, `0`, `+`, `-`. |
-| `JSON`       | JSON object, parsed with `JSON.parse(variableValue)`. / Obiekt JSON, parsowany za pomocą `JSON.parse(variableValue)`. |
-| `undefined`  | Uninitialized value. Set the variable, waiting for the value from `payload`. / Nie zainicjalizowana wartość. Ustawienie zmiennej w oczekiwaniu na nadanie wartości przez `payload`. |
+| Type | Conversion |
+|---|---|
+| string | `String(value)`; objects as JSON text |
+| integer | `Math.floor(Number(value))`, comma or dot as decimal separator |
+| float | `Number(value)`, comma or dot as decimal separator |
+| boolean | `true/false`, `1/0`, `+/-` |
+| JSON | `JSON.parse(text)`; objects are kept |
+| none | value stored as it comes |
 
----
+### Input / output
 
-## Node Statuses / Statusy węzła
+* **Input** `msg.payload` – new value.
+* **Output** – the same message with `msg.payload` = stored (converted) value.
+* Conversion errors (e.g. `"abc"` for *float*) leave the variable unchanged, turn the status red and are passed to a *Catch* node.
 
-| Color / Kolor | Status        | Description / Opis                                                                 |
-|---------------|---------------|-----------------------------------------------------------------------------------|
-| Green         | OK            | Variable successfully set or updated. / Zmienna została poprawnie ustawiona lub zaktualizowana. |
-| Red           | ERR           | An error occurred while setting or processing the variable. / Wystąpił błąd w trakcie ustawiania zmiennej lub przetwarzania wartości. |
+### Reading the variable
 
----
-
-## Examples
-
-```
- [
-    {
-        "id": "1",
-        "type": "tab",
-        "label": "AFYA Globals Examples",
-        "disabled": false,
-        "info": ""
-    },
-    {
-        "id": "example1",
-        "type": "inject",
-        "z": "1",
-        "name": "Set global string",
-        "props": [
-            {
-                "p": "payload"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "",
-        "payload": "Hello World",
-        "payloadType": "str",
-        "x": 120,
-        "y": 60,
-        "wires": [
-            [
-                "globals1"
-            ]
-        ]
-    },
-    {
-        "id": "globals1",
-        "type": "AFYA-globals",
-        "z": "1",
-        "name": "",
-        "globalVariableName": "greeting",
-        "globalVariableScope": "global",
-        "globalVariableType": "str",
-        "globalVariableValue": "Hello World",
-        "x": 380,
-        "y": 60,
-        "wires": [
-            [
-                "d9f37f7ae1706d60"
-            ]
-        ]
-    },
-    {
-        "id": "example2",
-        "type": "inject",
-        "z": "1",
-        "name": "Set global integer",
-        "props": [
-            {
-                "p": "payload"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "",
-        "payload": "42",
-        "payloadType": "num",
-        "x": 120,
-        "y": 120,
-        "wires": [
-            [
-                "globals2"
-            ]
-        ]
-    },
-    {
-        "id": "globals2",
-        "type": "AFYA-globals",
-        "z": "1",
-        "name": "",
-        "globalVariableName": "answer",
-        "globalVariableScope": "global",
-        "globalVariableType": "int",
-        "globalVariableValue": "42",
-        "x": 350,
-        "y": 120,
-        "wires": [
-            [
-                "d9f37f7ae1706d60"
-            ]
-        ]
-    },
-    {
-        "id": "example3",
-        "type": "inject",
-        "z": "1",
-        "name": "Set global float",
-        "props": [
-            {
-                "p": "payload"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "",
-        "payload": "3.14",
-        "payloadType": "num",
-        "x": 120,
-        "y": 180,
-        "wires": [
-            [
-                "globals3"
-            ]
-        ]
-    },
-    {
-        "id": "globals3",
-        "type": "AFYA-globals",
-        "z": "1",
-        "name": "",
-        "globalVariableName": "pi",
-        "globalVariableScope": "global",
-        "globalVariableType": "float",
-        "globalVariableValue": "3,14",
-        "x": 340,
-        "y": 180,
-        "wires": [
-            [
-                "d9f37f7ae1706d60"
-            ]
-        ]
-    },
-    {
-        "id": "example4",
-        "type": "inject",
-        "z": "1",
-        "name": "Set global boolean",
-        "props": [
-            {
-                "p": "payload"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "",
-        "payload": "true",
-        "payloadType": "bool",
-        "x": 120,
-        "y": 240,
-        "wires": [
-            [
-                "globals4"
-            ]
-        ]
-    },
-    {
-        "id": "globals4",
-        "type": "AFYA-globals",
-        "z": "1",
-        "name": "",
-        "globalVariableName": "is_active",
-        "globalVariableScope": "global",
-        "globalVariableType": "bool",
-        "globalVariableValue": "1",
-        "x": 350,
-        "y": 240,
-        "wires": [
-            [
-                "d9f37f7ae1706d60"
-            ]
-        ]
-    },
-    {
-        "id": "example5",
-        "type": "inject",
-        "z": "1",
-        "name": "Set global JSON",
-        "props": [
-            {
-                "p": "payload"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "",
-        "payload": "{\"name\": \"John\", \"age\": 30}",
-        "payloadType": "json",
-        "x": 120,
-        "y": 300,
-        "wires": [
-            [
-                "globals5"
-            ]
-        ]
-    },
-    {
-        "id": "globals5",
-        "type": "AFYA-globals",
-        "z": "1",
-        "name": "",
-        "globalVariableName": "user_info",
-        "globalVariableScope": "global",
-        "globalVariableType": "JSON",
-        "globalVariableValue": "{\"name\": \"John\", \"age\": 30}",
-        "globalEmitOnInit": false,
-        "x": 350,
-        "y": 300,
-        "wires": [
-            [
-                "d9f37f7ae1706d60"
-            ]
-        ]
-    },
-    {
-        "id": "8acd6e590be8d3f1",
-        "type": "inject",
-        "z": "1",
-        "name": "Set global JSON",
-        "props": [
-            {
-                "p": "payload"
-            }
-        ],
-        "repeat": "",
-        "crontab": "",
-        "once": false,
-        "onceDelay": 0.1,
-        "topic": "",
-        "payload": "{\"name\": \"John\", \"age\": 30}",
-        "payloadType": "json",
-        "x": 120,
-        "y": 360,
-        "wires": [
-            [
-                "cc4c2daec15a5eb8"
-            ]
-        ]
-    },
-    {
-        "id": "cc4c2daec15a5eb8",
-        "type": "AFYA-globals",
-        "z": "1",
-        "name": "autoemit",
-        "globalVariableName": "start_me",
-        "globalVariableScope": "global",
-        "globalVariableType": "str",
-        "globalVariableValue": "node-red-init",
-        "globalEmitOnInit": true,
-        "x": 320,
-        "y": 360,
-        "wires": [
-            [
-                "d9f37f7ae1706d60",
-                "3252158596a8d390"
-            ]
-        ]
-    },
-    {
-        "id": "d9f37f7ae1706d60",
-        "type": "debug",
-        "z": "1",
-        "name": "debug 1",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": false,
-        "complete": "false",
-        "statusVal": "",
-        "statusType": "auto",
-        "x": 740,
-        "y": 200,
-        "wires": []
-    },
-    {
-        "id": "7c0f4ed50ae82e9f",
-        "type": "comment",
-        "z": "1",
-        "name": "about autoemit",
-        "info": "now you can start emitting a signal, after initializing node-red - e.g. to set some initial data, download them. server, or set data, after restart\nteraz możesz rozpocząć emisję sygnału, po inicjalizacji node-red - np. dla ustawienia jakichś danych początkowych, pobrania ich. serwera, czy ustawienia danych, po restarcie",
-        "x": 340,
-        "y": 420,
-        "wires": []
-    },
-    {
-        "id": "3252158596a8d390",
-        "type": "link out",
-        "z": "1",
-        "name": "link_out_EMIT",
-        "mode": "link",
-        "links": [
-            "0b335beb1d6269c7",
-            "3cd3360e0a5c13c4",
-            "e455d74b4e1cda2c"
-        ],
-        "x": 605,
-        "y": 360,
-        "wires": []
-    },
-    {
-        "id": "3cd3360e0a5c13c4",
-        "type": "link in",
-        "z": "1",
-        "name": "link in 1",
-        "links": [
-            "3252158596a8d390"
-        ],
-        "x": 735,
-        "y": 320,
-        "wires": [
-            [
-                "c8919efcc73f3ad0"
-            ]
-        ]
-    },
-    {
-        "id": "e455d74b4e1cda2c",
-        "type": "link in",
-        "z": "1",
-        "name": "link in 2",
-        "links": [
-            "3252158596a8d390"
-        ],
-        "x": 735,
-        "y": 380,
-        "wires": [
-            [
-                "c8919efcc73f3ad0"
-            ]
-        ]
-    },
-    {
-        "id": "0b335beb1d6269c7",
-        "type": "link in",
-        "z": "1",
-        "name": "link in 3",
-        "links": [
-            "3252158596a8d390"
-        ],
-        "x": 735,
-        "y": 440,
-        "wires": [
-            [
-                "c8919efcc73f3ad0"
-            ]
-        ]
-    },
-    {
-        "id": "c8919efcc73f3ad0",
-        "type": "debug",
-        "z": "1",
-        "name": "debug 2",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": false,
-        "complete": "false",
-        "statusVal": "",
-        "statusType": "auto",
-        "x": 920,
-        "y": 360,
-        "wires": []
-    }
-]
+```js
+// function node
+const pi = global.get("pi");
 ```
 
+…or in *change*, *switch* and *inject* nodes via `global.pi`.
+
+### Example
+
+**Menu → Import → Examples → node-red-contrib-afya-globals → AFYA Globals Examples**
+
+### What's new in 1.1.0
+
+Native global/flow picker with context stores, value field with a type picker (JSON editor included),
+fixed handling of incoming messages, modern edit dialog. Existing flows keep working without changes.
+See [change.log](change.log).
+
 ---
-## Author / Autor
 
-**Marcin Chuć**  
-ORCID: 0000-0002-8430-9763  
-E-mail: marcin...change it to at...afya.pl
+## Polski
 
+### Co robi
+
+* Po wdrożeniu (deploy) ustawia `global.<nazwa>` lub `flow.<nazwa>` na podaną wartość, zamienioną na wybrany typ.
+* Każde `msg.payload` nadpisuje zmienną – wartości proste są zamieniane na ten typ
+  (np. `"21,5"` → `21.5` dla *float*), obiekty i tablice zapisywane bez zmian.
+* Opcjonalnie wysyła wartość na wyjście zaraz po starcie – do inicjalizacji po restarcie.
+
+### Instalacja
+
+```bash
+cd ~/.node-red
+npm install node-red-contrib-afya-globals
+```
+
+Wymaga Node-RED ≥ 3.0 i Node.js ≥ 18. Węzeł **set variable** jest w grupie palety **AFYA**.
+
+### Konfiguracja
+
+| Pole | Opis |
+|---|---|
+| **Variable** | Nazwa i zakres (`global` / `flow`), opcjonalnie magazyn kontekstu (np. trwały `file`). |
+| **Value** | Wartość początkowa z typem: `string`, `integer`, `float`, `boolean`, `JSON` lub `none` (nic nie jest ustawiane, węzeł czeka na `msg.payload`). |
+| **Send the value after deploy** | Wysyła `msg.payload` = wartość (i `msg.topic` = nazwa zmiennej) 100 ms po starcie. |
+| **Name** | Opcjonalna nazwa; gdy pusta, węzeł pokazuje `zakres.nazwa = wartość`. |
+
+Błąd zamiany (np. `"abc"` dla *float*) nie zmienia zmiennej, daje czerwony status i trafia do węzła *Catch*.
+Zmienną odczytasz w dowolnym flow: `global.get("nazwa")`.
+
+### Nowości w 1.1.0
+
+Wybór global/flow z magazynami kontekstu, jedno pole wartości z typem (z edytorem JSON), poprawiona obsługa
+wiadomości wejściowych, nowoczesny formularz. Istniejące flow działają bez zmian.
+
+---
+
+Marcin Chuć · ORCID [0000-0002-8430-9763](https://orcid.org/0000-0002-8430-9763) · [MIT](LICENSE)

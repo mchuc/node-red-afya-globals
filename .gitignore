@@ -133,3 +133,5 @@ dist
 .idea
 
 local.tar.gz
+# keep the change log
+!change.log

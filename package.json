@@ -1,34 +1,50 @@
 {
   "name": "node-red-contrib-afya-globals",
-  "version": "1.0.6",
-  "description": "Node-RED custom node to manage global variables.",
+  "version": "1.1.0",
+  "description": "Node-RED node that sets typed global / flow context variables (string, integer, float, boolean, JSON) on deploy and from msg.payload.",
   "main": "globals.js",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "node-red",
+    "afya",
+    "global",
+    "flow",
+    "context",
+    "variable",
+    "typed",
+    "scope",
+    "inject",
+    "at start",
+    "default values",
+    "JSON"
+  ],
   "node-red": {
-    "version": ">=2.0.0",
+    "version": ">=3.0.0",
     "nodes": {
       "AFYA-globals": "globals.js"
     }
   },
   "engines": {
-    "node": ">=12.0.0"
+    "node": ">=18"
   },
+  "files": [
+    "globals.js",
+    "globals.html",
+    "examples/",
+    "LICENSE",
+    "README.md",
+    "change.log"
+  ],
+  "author": "Marcin Chuć <marcin@afya.pl> (https://github.com/mchuc)",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mchuc/node-red-afya-globals"
+    "url": "git+https://github.com/mchuc/node-red-afya-globals.git"
   },
-  "author": "Marcin Chuć, marcin a.t afya.pl",
-  "keywords": [
-    "node-red",
-    "inject",
-    "JSON",
-    "global",
-    "flow",
-    "variable",
-    "scope",
-    "value",
-    "AFYA",
-    "at start",
-    "set default values"
-  ]
+  "bugs": {
+    "url": "https://github.com/mchuc/node-red-afya-globals/issues"
+  },
+  "homepage": "https://github.com/mchuc/node-red-afya-globals#readme"
 }
