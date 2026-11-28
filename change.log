@@ -1,3 +1,7 @@
+1.2.0 (2026-11-28):
+- Edit dialog: new setting "Labels" – descriptions in Polish for a Polish system, English for all others,
+  or chosen by hand (English / Polski); only the descriptions change, fields and values stay the same
+
 1.1.0 (2026-11-25):
 - Variable picker uses the native global/flow selector, incl. context stores (e.g. persistent "file" store)
 - One value field with a type picker: string, integer, float, boolean, JSON (with editor), none

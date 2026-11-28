@@ -1,6 +1,6 @@
 {
   "name": "node-red-contrib-afya-globals",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Node-RED node that sets typed global / flow context variables (string, integer, float, boolean, JSON) on deploy and from msg.payload.",
   "main": "globals.js",
   "scripts": {

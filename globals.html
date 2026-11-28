@@ -36,6 +36,65 @@
     const plainKey = (v) => String(v || '').replace(/^#:\(\S+?\)::/, '');
     const isNumber = (v) => /^\s*[-+]?(\d+([.,]\d*)?|[.,]\d+)([eE][-+]?\d+)?\s*$/.test(String(v));
     const isJSON = (v) => { try { JSON.parse(v); return true; } catch (e) { return false; } };
+    const TEXTS = {
+      en: {
+        name: 'Name', namePh: 'optional – shows the value when empty', lang: 'Labels', langAuto: 'system language ({l})',
+        secVar: 'Variable', variable: 'Variable',
+        varHint: 'Unique name. Choose <b>global</b> to read it from any flow: <code>global.get("name")</code>.',
+        secInit: 'Initial value', value: 'Value', emit: 'Send the value to the output after deploy / restart',
+        tStr: 'string', tInt: 'integer', tFloat: 'float', tBool: 'boolean', tNone: 'none – wait for msg.payload',
+        sUntouched: 'On deploy {t} is left untouched.', sSet: 'On deploy {t} is set to the value above ({type}).',
+        sOverwrite: 'Every incoming <code>msg.payload</code> overwrites it.',
+        sConvert: 'Every incoming <code>msg.payload</code> overwrites it – plain values are converted to {type}.',
+        sEmit: 'The value is also sent to the output right after deploy.',
+      },
+      pl: {
+        name: 'Nazwa', namePh: 'opcjonalnie – puste = pokazuje wartość', lang: 'Etykiety', langAuto: 'język systemu ({l})',
+        secVar: 'Zmienna', variable: 'Zmienna',
+        varHint: 'Unikalna nazwa. Wybierz <b>global</b>, żeby czytać ją z każdego flow: <code>global.get("nazwa")</code>.',
+        secInit: 'Wartość początkowa', value: 'Wartość', emit: 'Wyślij wartość na wyjście po wdrożeniu / restarcie',
+        tStr: 'tekst', tInt: 'liczba całkowita', tFloat: 'liczba', tBool: 'prawda / fałsz', tNone: 'brak – czekaj na msg.payload',
+        sUntouched: 'Po wdrożeniu {t} zostaje bez zmian.', sSet: 'Po wdrożeniu {t} dostaje wartość powyżej ({type}).',
+        sOverwrite: 'Każdy przychodzący <code>msg.payload</code> ją nadpisuje.',
+        sConvert: 'Każdy przychodzący <code>msg.payload</code> ją nadpisuje – zwykłe wartości są zamieniane na {type}.',
+        sEmit: 'Wartość trafia też na wyjście zaraz po wdrożeniu.',
+      },
+    };
+    // --- AFYA: język opisów w oknie konfiguracji („Labels”): auto = polski tylko dla polskiego systemu,
+    //     angielski dla wszystkich innych; zmieniają się tylko opisy – nigdy pola ani wartości.
+    const afyaSystemLocale = function () {
+      try {
+        return localStorage.getItem('editor-language') || navigator.language || '';
+      } catch (e) {
+        return navigator.language || '';
+      }
+    };
+    const afyaLang = function (setting) {
+      if (setting === 'pl' || setting === 'en') return setting;
+      return /^pl\b|^pl[-_]/i.test(afyaSystemLocale()) ? 'pl' : 'en';
+    };
+    /** Tłumaczy otwarte okno (data-t, data-t-ph, data-t-title) i zwraca T(klucz, zmienne) dla tekstów z kodu. */
+    const afyaApplyLang = function (form, texts, setting) {
+      const lang = afyaLang(setting);
+      const T = function (k, v) {
+        let s = (texts[lang] && texts[lang][k]) || texts.en[k] || k;
+        Object.keys(v || {}).forEach(function (n) {
+          s = s.split('{' + n + '}').join(v[n]);
+        });
+        return s;
+      };
+      form.find('[data-t]').each(function () {
+        $(this).html(T($(this).attr('data-t')));
+      });
+      form.find('[data-t-ph]').each(function () {
+        $(this).attr('placeholder', T($(this).attr('data-t-ph')));
+      });
+      form.find('[data-t-title]').each(function () {
+        $(this).attr('title', T($(this).attr('data-t-title')));
+      });
+      form.find('#node-input-lang option[value="auto"]').text(T('langAuto', { l: afyaLang('auto') === 'pl' ? 'Polski' : 'English' }));
+      return T;
+    };
 
     RED.nodes.registerType('AFYA-globals', {
       category: 'AFYA',
@@ -48,6 +107,7 @@
       outputLabels: 'msg.payload = stored value',
       defaults: {
         name: { value: '' },
+        lang: { value: 'auto' },
         globalVariableName: { value: '', required: true },
         globalVariableScope: { value: 'global', required: true },
         globalVariableType: { value: 'undefined', required: true },
@@ -67,6 +127,9 @@
       },
       oneditprepare: function () {
         const node = this;
+        if (['auto', 'en', 'pl'].indexOf(node.lang) < 0) $('#node-input-lang').val('auto'); // starsze węzły
+        const form = $('#node-input-lang').closest('.afya-form');
+        let T = afyaApplyLang(form, TEXTS, $('#node-input-lang').val());
 
         // variable: global/flow + context store picker (native Node-RED widget)
         if (!plainKey(node.globalVariableName)) {
@@ -101,16 +164,19 @@
           const v = String(node.globalVariableValue).trim().toLowerCase();
           $('#node-input-globalVariableValue').val(['true', '1', '+'].includes(v) ? 'true' : 'false');
         }
+        const valueTypes = function () {
+          return [
+            { value: 'str', label: T('tStr'), icon: 'red/images/typedInput/az.svg' },
+            { value: 'int', label: T('tInt'), icon: 'red/images/typedInput/09.svg', validate: isNumber },
+            { value: 'float', label: T('tFloat'), icon: 'red/images/typedInput/09.svg', validate: isNumber },
+            { value: 'bool', label: T('tBool'), icon: 'red/images/typedInput/bool.svg', options: ['true', 'false'] },
+            jsonType,
+            { value: 'undefined', label: T('tNone'), hasValue: false },
+          ];
+        };
         $('#node-input-globalVariableValue').typedInput({
           typeField: '#node-input-globalVariableType',
-          types: [
-            { value: 'str', label: 'string', icon: 'red/images/typedInput/az.svg' },
-            { value: 'int', label: 'integer', icon: 'red/images/typedInput/09.svg', validate: isNumber },
-            { value: 'float', label: 'float', icon: 'red/images/typedInput/09.svg', validate: isNumber },
-            { value: 'bool', label: 'boolean', icon: 'red/images/typedInput/bool.svg', options: ['true', 'false'] },
-            jsonType,
-            { value: 'undefined', label: 'none – wait for msg.payload', hasValue: false },
-          ],
+          types: valueTypes(),
         });
 
         const summary = function () {
@@ -118,16 +184,22 @@
           const key = plainKey($('#node-input-globalVariableName').typedInput('value')) || '…';
           const type = $('#node-input-globalVariableValue').typedInput('type');
           const target = '<code>' + scope + '.' + $('<span>').text(key).html() + '</code>';
-          let text = type === 'undefined'
-            ? 'On deploy ' + target + ' is left untouched.'
-            : 'On deploy ' + target + ' is set to the value above (' + type + ').';
-          text += ' Every incoming <code>msg.payload</code> overwrites it' +
-            (type === 'undefined' ? '.' : ' – plain values are converted to ' + type + '.');
-          if ($('#node-input-globalEmitOnInit').is(':checked')) text += ' The value is also sent to the output right after deploy.';
+          let text = type === 'undefined' ? T('sUntouched', { t: target }) : T('sSet', { t: target, type: type });
+          text += ' ' + (type === 'undefined' ? T('sOverwrite') : T('sConvert', { type: type }));
+          if ($('#node-input-globalEmitOnInit').is(':checked')) text += ' ' + T('sEmit');
           $('#afya-globals-summary').html(text);
         };
         $('#node-input-globalVariableName, #node-input-globalVariableValue').on('change', summary);
         $('#node-input-globalEmitOnInit').on('change', summary);
+        $('#node-input-lang').on('change', function () {
+          T = afyaApplyLang(form, TEXTS, $(this).val());
+          const v = $('#node-input-globalVariableValue');
+          const current = { type: v.typedInput('type'), value: v.typedInput('value') };
+          v.typedInput('types', valueTypes());
+          v.typedInput('type', current.type);
+          v.typedInput('value', current.value);
+          summary();
+        });
         summary();
       },
     });
@@ -137,27 +209,35 @@
 <script type="text/html" data-template-name="AFYA-globals">
   <div class="afya-form">
     <div class="form-row">
-      <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
-      <input type="text" id="node-input-name" placeholder="optional – shows the value when empty" style="width: 65%;">
+      <label for="node-input-name"><i class="fa fa-tag"></i> <span data-t="name">Name</span></label>
+      <input type="text" id="node-input-name" data-t-ph="namePh" placeholder="optional – shows the value when empty" style="width: 65%;">
+    </div>
+    <div class="form-row">
+      <label for="node-input-lang"><i class="fa fa-language"></i> <span data-t="lang">Labels</span></label>
+      <select id="node-input-lang" style="width: 65%;">
+        <option value="auto">system language</option>
+        <option value="en">English</option>
+        <option value="pl">Polski</option>
+      </select>
     </div>
 
-    <div class="afya-section"><i class="fa fa-database"></i> Variable</div>
+    <div class="afya-section"><i class="fa fa-database"></i> <span data-t="secVar">Variable</span></div>
     <div class="form-row">
-      <label for="node-input-globalVariableName"><i class="fa fa-globe"></i> Variable</label>
+      <label for="node-input-globalVariableName"><i class="fa fa-globe"></i> <span data-t="variable">Variable</span></label>
       <input type="text" id="node-input-globalVariableName" style="width: 65%;">
       <input type="hidden" id="node-input-globalVariableScope">
     </div>
-    <div class="afya-hint">Unique name. Choose <b>global</b> to read it from any flow: <code>global.get("name")</code>.</div>
+    <div class="afya-hint" data-t="varHint">Unique name. Choose <b>global</b> to read it from any flow: <code>global.get("name")</code>.</div>
 
-    <div class="afya-section"><i class="fa fa-pencil"></i> Initial value</div>
+    <div class="afya-section"><i class="fa fa-pencil"></i> <span data-t="secInit">Initial value</span></div>
     <div class="form-row">
-      <label for="node-input-globalVariableValue"><i class="fa fa-cube"></i> Value</label>
+      <label for="node-input-globalVariableValue"><i class="fa fa-cube"></i> <span data-t="value">Value</span></label>
       <input type="text" id="node-input-globalVariableValue" style="width: 65%;">
       <input type="hidden" id="node-input-globalVariableType">
     </div>
     <div class="afya-check">
       <input type="checkbox" id="node-input-globalEmitOnInit">
-      <label for="node-input-globalEmitOnInit">Send the value to the output after deploy / restart</label>
+      <label for="node-input-globalEmitOnInit" data-t="emit">Send the value to the output after deploy / restart</label>
     </div>
 
     <div class="afya-summary"><i class="fa fa-info-circle"></i><span id="afya-globals-summary"></span></div>
